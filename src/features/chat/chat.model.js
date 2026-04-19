@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import { baseSchemaFields, baseSchemaOptions } from "../../base/BaseModel.js";
 
-// Pipeline adımı — tek bir modelin girdi/çıktısını tutar
 const adimSchema = new mongoose.Schema(
   {
     model_id:    { type: String },
@@ -14,7 +13,6 @@ const adimSchema = new mongoose.Schema(
   { _id: false }
 );
 
-// Tur — kullanıcının bir sorusu ve o soruya ait pipeline sonuçları
 const turSchema = new mongoose.Schema({
   kullanici_mesaji: { type: String },
   pipeline:         { type: [adimSchema] },
@@ -22,7 +20,6 @@ const turSchema = new mongoose.Schema({
   tarih:            { type: Date, default: Date.now },
 });
 
-// Sohbet oturumu — bir kullanıcıya ait tüm turları içerir
 const chatSchema = new mongoose.Schema(
   {
     ...baseSchemaFields,

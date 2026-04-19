@@ -14,12 +14,28 @@ export class ChatManager extends BaseManager {
     return await this.repo.create({
       ad: baslik || "Yeni Sohbet",
       kullanici_id,
-      mesajlar: [],
+      turlar: [],
     });
+  }
+
+  async getSession(chatId) {
+    return await this.repo.getById(chatId);
   }
 
   async getSessions(kullanici_id) {
     return await this.repo.findByUser(kullanici_id);
+  }
+
+  async getSessionsPaginated(kullanici_id, page, limit) {
+    return await this.repo.getAllPaginated({ kullanici_id, page, limit });
+  }
+
+  async updateSession(chatId, yeniBaslik) {
+    return await this.repo.updateChat(chatId, { ad: yeniBaslik });
+  }
+
+  async deleteSession(chatId) {
+    return await this.repo.deleteChat(chatId);
   }
 
   async sendMessage(chatId, kullaniciSorusu) {
@@ -42,13 +58,13 @@ export class ChatManager extends BaseManager {
 
     const toplamSure = Date.now() - baslangic;
 
-    await this.repo.addMessage(chatId, {
-      kullanici_sorusu: kullaniciSorusu,
-      pipeline: { model1: adim1, model2: adim2, model3: adim3 },
-      final_yanit: adim3.icerik,
-      toplam_sure_ms: toplamSure,
-      durum: "tamamlandi",
-    });
+    const tur = {
+      kullanici_mesaji: kullaniciSorusu, 
+      pipeline: [adim1, adim2, adim3],   
+      final_cevap: adim3.icerik,       
+    };
+
+    await this.repo.addMessage(chatId, tur);
 
     return {
       final_yanit:    adim3.icerik,
