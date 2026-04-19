@@ -106,7 +106,7 @@ src/
 
 #### 1. Repoyu klonla
 ```bash
-git clone https://github.com/kullanici-adi/ai-orchestrator.git
+git clone https://github.com/TheBottle2/ai-orchestrator.git
 cd ai-orchestrator
 ```
 
@@ -241,7 +241,7 @@ src/
 
 #### 1. Clone the repo
 ```bash
-git clone https://github.com/your-username/ai-orchestrator.git
+git clone https://github.com/TheBottle2/ai-orchestrator.git
 cd ai-orchestrator
 ```
 
