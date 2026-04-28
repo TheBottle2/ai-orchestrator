@@ -35,7 +35,7 @@ export default function Login() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-gray-900 rounded-2xl p-8 border border-gray-800">
         <h1 className="text-white text-2xl font-semibold mb-2">Giriş Yap</h1>
-        <p className="text-gray-400 text-sm mb-8">AI Orchestrator'a hoş geldin</p>
+        <p className="text-gray-400 text-sm mb-8">AI Orchestrator&apos;a hoş geldin</p>
 
         {hata && (
           <div className="bg-red-950 border border-red-800 text-red-300 text-sm rounded-lg px-4 py-3 mb-6">

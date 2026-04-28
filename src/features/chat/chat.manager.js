@@ -2,8 +2,10 @@ import { BaseManager } from "../../base/BaseManager.js";
 import { ChatRepo } from "./chat.repo.js";
 import { config } from "../../core/config.js";
 
+// Cache mekanizması için global değişken
+const modelCache = new Map();
 const repo = new ChatRepo();
-const LM_URL = `${config.lmStudioBaseUrl}/v1/chat/completions`;
+const LM_URL = `${config.ollamaBaseUrl}/v1/chat/completions`;
 
 export class ChatManager extends BaseManager {
   constructor() {
@@ -73,38 +75,42 @@ export class ChatManager extends BaseManager {
     };
   }
 
-  async _modelCagir(modelConfig, messages) {
-    const baslangic  = Date.now();
-    const controller = new AbortController();
-    const timeout    = setTimeout(() => controller.abort(), 300000);
+async _modelCagir(modelConfig, messages) {
+  const cacheKey = modelConfig.id;
+  const baslangic = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 180000); // 3 dakika
 
-    try {
-      const response = await fetch(LM_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model:       modelConfig.id,
-          messages,
-          temperature: 0.7,
-          max_tokens:  256,
-        }),
-      });
+  try {
+    const response = await fetch(LM_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: modelConfig.id,
+        messages,
+        temperature: config.temperature,
+        max_tokens: config.maxTokens,
+      }),
+    });
 
       if (!response.ok) {
         throw new Error(`Model hatası: ${modelConfig.id} — HTTP ${response.status}`);
       }
 
-      const data   = await response.json();
-      const ham    = data.choices?.[0]?.message?.content || "";
-      const icerik = this._temizle(ham);
+    const data = await response.json();
+    const ham = data.choices?.[0]?.message?.content || "";
+    const icerik = this._temizle(ham);
 
-      return {
-        model_id: modelConfig.id,
-        rol:      modelConfig.rol,
-        icerik,
-        sure_ms:  Date.now() - baslangic,
-      };
+    // Cache'i güncelle
+    modelCache.set(cacheKey, { lastUsed: Date.now() });
+
+    return {
+      model_id: modelConfig.id,
+      rol: modelConfig.rol,
+      icerik,
+      sure_ms: Date.now() - baslangic,
+    };
     } finally {
       clearTimeout(timeout);
     }

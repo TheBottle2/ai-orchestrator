@@ -13,23 +13,23 @@ export default function Chat() {
   const [sessionHata, setSessionHata] = useState("");
   const altRef = useRef(null);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const k = localStorage.getItem("kullanici");
-    if (!token || !k || k === "undefined" || k === "null") {
-      localStorage.clear();
-      router.push("/login");
-      return;
-    }
-    try {
-      const parsed = JSON.parse(k);
-      setKullanici(parsed);
-      oturumBaslat(parsed);
-    } catch {
-      localStorage.clear();
-      router.push("/login");
-    }
-  }, []);
+useEffect(() => {
+  const token = localStorage.getItem("token");
+  const k = localStorage.getItem("kullanici");
+  if (!token || !k || k === "undefined" || k === "null") {
+    localStorage.clear();
+    router.push("/login");
+    return;
+  }
+  try {
+    const parsed = JSON.parse(k);
+    setKullanici(parsed);
+    oturumBaslat(parsed);
+  } catch {
+    localStorage.clear();
+    router.push("/login");
+  }
+}, [router]);
 
   useEffect(() => {
     altRef.current?.scrollIntoView({ behavior: "smooth" });
