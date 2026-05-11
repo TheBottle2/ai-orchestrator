@@ -7,6 +7,7 @@ const m = new ChatManager();
 
 export async function POST(req, { params }) {
   try {
+    // Mesaj gonderme: sohbet id'si ve mesaj body'si ile pipeline calisir
     const { id } = await params;
     
     if (!id) {

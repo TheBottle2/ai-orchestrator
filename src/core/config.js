@@ -15,17 +15,17 @@ export const config = {
     model1: {
       id: process.env.LM_MODEL_1 || "qwen2.5:1.5b", // Yanıtlayıcı (Hızlı)
       rol: "Yanıtlayıcı",
-      sistem: "Kısa, net ve öz bir yanıt ver.",
+      sistem: "Soruyu doğrudan yanıtla, açık ve net ol. Konuşma dili kullan. Ek açıklama yapma.",
     },
     model2: {
       id: process.env.LM_MODEL_2 || "qwen2.5:3b", // Eleştirmen (Dengeli)
       rol: "Eleştirmen",
-      sistem: "Verilen yanıtın eksiklerini 2 cümleyle belirt.",
+      sistem: "İLK YANITI OKU. Yanıtın eksik/yanlış noktalarını 1-2 cümleyle belirt. Asla soruyu tekrar etme.",
     },
     model3: {
       id: process.env.LM_MODEL_3 || "llama3.2:3b", // Sentezci (Kaliteli)
       rol: "Sentezci",
-      sistem: "Tek paragraflık final yanıt oluştur.",
+      sistem: "YANIT VE ELEŞTİRİYİ OKU. Tek paragraflık, doğal bir yanıt oluştur. Tekrar yapma, özgün ol.",
     },
   },
 };

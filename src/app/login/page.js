@@ -5,15 +5,19 @@ import Link from "next/link";
 
 export default function Login() {
   const router = useRouter();
+  // Form verileri: e-posta ve sifre API'ye gonderilir
   const [form, setForm] = useState({ email: "", sifre: "" });
+  // UI durumlari: hata mesaji ve yukleniyor durumu
   const [hata, setHata] = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
+    // Giris istegi baslarken hata ve yuklenme durumunu guncelle
     setHata("");
     setYukleniyor(true);
     try {
+      // Veriyi backend'den cek: /api/auth/login
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -21,6 +25,7 @@ export default function Login() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.mesaj || "Giriş başarısız.");
+      // Token ve kullanici bilgisi dinamik olarak gelir ve localStorage'a yazilir
       localStorage.setItem("token", data.token);
       localStorage.setItem("kullanici", JSON.stringify(data.kullanici));
       router.push("/chat");
@@ -66,6 +71,7 @@ export default function Login() {
               required
             />
           </div>
+          {/* Buton: formu gonderir ve giris istegini tetikler */}
           <button
             type="submit"
             disabled={yukleniyor}
@@ -77,6 +83,7 @@ export default function Login() {
 
         <p className="text-gray-500 text-sm text-center mt-6">
           Hesabın yok mu?{" "}
+          {/* Kayit sayfasina yonlendiren baglanti */}
           <Link href="/register" className="text-blue-400 hover:text-blue-300">
             Kayıt ol
           </Link>

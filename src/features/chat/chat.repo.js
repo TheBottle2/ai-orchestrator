@@ -6,10 +6,12 @@ export class ChatRepo extends BaseRepo {
     super(ChatModel);
   }
 
+  // Tek bir sohbet kaydini getirir
   async getById(chatId) {
     return await this.get_one(chatId);
   }
 
+  // Kullaniciya ait sohbetleri sayfalar (liste/arama ekranlari icin)
   async getAllPaginated({ kullanici_id, page = 1, limit = 10 }) {
     return await this.get_many({
       filters: { kullanici_id },
@@ -20,6 +22,7 @@ export class ChatRepo extends BaseRepo {
     });
   }
 
+  // Kullaniciya ait sohbetlerin basliklarini getirir (turlar dahil edilmez)
   async findByUser(kullanici_id) {
     return await this.model
       .find({ kullanici_id, silindi_mi: false })
@@ -27,6 +30,7 @@ export class ChatRepo extends BaseRepo {
       .sort({ degistirilme_tarihi: -1 });
   }
 
+  // Sohbete yeni mesaj turu ekler
   async addMessage(chatId, tur) {
     return await this.model.findByIdAndUpdate(
       chatId,

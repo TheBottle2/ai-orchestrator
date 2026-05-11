@@ -4,20 +4,26 @@ import { useRouter } from "next/navigation";
 
 export default function Chat() {
   const router = useRouter();
+  // Kullanici bilgisi: localStorage'dan gelir
   const [kullanici, setKullanici] = useState(null);
+  // Sohbet oturumu id: backend'den olusturulur
   const [sessionId, setSessionId] = useState(null);
+  // Dinamik mesajlar: kullanici ve asistan mesajlari burada tutulur
   const [mesajlar, setMesajlar] = useState([]);
+  // Girdi alani ve UI durumlari
   const [input, setInput] = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
+  // Pipeline detaylari: 3 modelin ciktilari
   const [pipeline, setPipeline] = useState(null);
   const [sessionHata, setSessionHata] = useState("");
   const altRef = useRef(null);
 
-useEffect(() => {
-  const token = localStorage.getItem("token");
-  const k = localStorage.getItem("kullanici");
-  if (!token || !k || k === "undefined" || k === "null") {
-    localStorage.clear();
+  // Oturum kontrolu: token yoksa girise yonlendir
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const k = localStorage.getItem("kullanici");
+    if (!token || !k || k === "undefined" || k === "null") {
+      localStorage.clear();
     router.push("/login");
     return;
   }
@@ -29,12 +35,14 @@ useEffect(() => {
     localStorage.clear();
     router.push("/login");
   }
-}, [router]);
+  }, [router]);
 
+  // Yeni mesaj geldikce listeyi alta kaydir
   useEffect(() => {
     altRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mesajlar, yukleniyor]);
 
+  // Yeni sohbet oturumu baslatir: backend /api/chat
   async function oturumBaslat(k) {
     try {
       const res = await fetch("/api/chat", {
@@ -50,6 +58,7 @@ useEffect(() => {
     }
   }
 
+  // Kullanici mesajini pipeline'a gonderir ve yanitlari alir
   async function mesajGonder() {
     if (!input.trim() || yukleniyor || !sessionId) return;
     const soru = input.trim();
@@ -59,6 +68,7 @@ useEffect(() => {
     setYukleniyor(true);
 
     try {
+      // Veriyi backend'den cek: /api/chat/:id/messages
       const res = await fetch(`/api/chat/${sessionId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -75,6 +85,7 @@ useEffect(() => {
     }
   }
 
+  // Cikis butonu: localStorage temizler ve girise yonlendirir
   function cikisYap() {
     localStorage.clear();
     router.push("/login");

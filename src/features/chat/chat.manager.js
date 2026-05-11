@@ -12,6 +12,7 @@ export class ChatManager extends BaseManager {
     super(repo);
   }
 
+  // Yeni sohbet oturumu olusturur (veri MongoDB'ye yazilir)
   async createSession(kullanici_id, baslik) {
     return await this.repo.create({
       ad: baslik || "Yeni Sohbet",
@@ -20,10 +21,12 @@ export class ChatManager extends BaseManager {
     });
   }
 
+  // Tek sohbet kaydini getirir
   async getSession(chatId) {
     return await this.repo.getById(chatId);
   }
 
+  // Kullaniciya ait tum sohbetleri listeler
   async getSessions(kullanici_id) {
     return await this.repo.findByUser(kullanici_id);
   }
@@ -40,6 +43,7 @@ export class ChatManager extends BaseManager {
     return await this.repo.deleteChat(chatId);
   }
 
+  // Mesaji 3 adimli pipeline'a gonderir ve sonucu kaydeder
   async sendMessage(chatId, kullaniciSorusu) {
     const baslangic = Date.now();
 
@@ -75,47 +79,49 @@ export class ChatManager extends BaseManager {
     };
   }
 
-async _modelCagir(modelConfig, messages) {
-  const cacheKey = modelConfig.id;
-  const baslangic = Date.now();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 180000); // 3 dakika
+  // Ollama'ya istek atar ve yaniti duzenler
+  async _modelCagir(modelConfig, messages) {
+    const cacheKey = modelConfig.id;
+    const baslangic = Date.now();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 180000); // 3 dakika
 
-  try {
-    const response = await fetch(LM_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: modelConfig.id,
-        messages,
-        temperature: config.temperature,
-        max_tokens: config.maxTokens,
-      }),
-    });
+    try {
+      const response = await fetch(LM_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: modelConfig.id,
+          messages,
+          temperature: config.temperature,
+          max_tokens: config.maxTokens,
+        }),
+      });
 
       if (!response.ok) {
         throw new Error(`Model hatası: ${modelConfig.id} — HTTP ${response.status}`);
       }
 
-    const data = await response.json();
-    const ham = data.choices?.[0]?.message?.content || "";
-    const icerik = this._temizle(ham);
+      const data = await response.json();
+      const ham = data.choices?.[0]?.message?.content || "";
+      const icerik = this._temizle(ham);
 
-    // Cache'i güncelle
-    modelCache.set(cacheKey, { lastUsed: Date.now() });
+      // Cache'i guncelle (model son kullanimi)
+      modelCache.set(cacheKey, { lastUsed: Date.now() });
 
-    return {
-      model_id: modelConfig.id,
-      rol: modelConfig.rol,
-      icerik,
-      sure_ms: Date.now() - baslangic,
-    };
+      return {
+        model_id: modelConfig.id,
+        rol: modelConfig.rol,
+        icerik,
+        sure_ms: Date.now() - baslangic,
+      };
     } finally {
       clearTimeout(timeout);
     }
   }
 
+  // Model ciktilarindaki dusunce bloklarini temizler
   _temizle(text) {
     if (!text) return "";
     return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();

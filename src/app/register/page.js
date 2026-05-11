@@ -5,15 +5,19 @@ import Link from "next/link";
 
 export default function Register() {
   const router = useRouter();
+  // Form verileri: ad, e-posta ve sifre API'ye gonderilir
   const [form, setForm] = useState({ ad: "", email: "", sifre: "" });
+  // UI durumlari: hata mesaji ve yukleniyor durumu
   const [hata, setHata] = useState("");
   const [yukleniyor, setYukleniyor] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
+    // Kayit istegi baslarken hata ve yuklenme durumunu guncelle
     setHata("");
     setYukleniyor(true);
     try {
+      // Veriyi backend'den cek: /api/auth/register
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -21,6 +25,7 @@ export default function Register() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.mesaj || "Kayıt başarısız.");
+      // Token ve kullanici bilgisi dinamik olarak gelir ve localStorage'a yazilir
       localStorage.setItem("token", data.token);
       localStorage.setItem("kullanici", JSON.stringify(data.kullanici));
       router.push("/chat");
@@ -77,6 +82,7 @@ export default function Register() {
               required
             />
           </div>
+          {/* Buton: formu gonderir ve kayit istegini tetikler */}
           <button
             type="submit"
             disabled={yukleniyor}
@@ -88,6 +94,7 @@ export default function Register() {
 
         <p className="text-gray-500 text-sm text-center mt-6">
           Zaten hesabın var mı?{" "}
+          {/* Giris sayfasina yonlendiren baglanti */}
           <Link href="/login" className="text-blue-400 hover:text-blue-300">
             Giriş yap
           </Link>

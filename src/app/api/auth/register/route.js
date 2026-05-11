@@ -7,6 +7,7 @@ const m = new UserManager();
 
 export async function POST(req) {
   try {
+    // Veritabanina baglan, gelen body'yi dogrula ve kayit islemini calistir
     await connectDB();
     const body    = await req.json();
     const data    = UserCreateSchema.parse(body);

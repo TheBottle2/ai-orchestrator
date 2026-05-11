@@ -12,6 +12,7 @@ export class UserManager extends BaseManager {
     super(repo);
   }
 
+  // Kayit: yeni kullaniciyi olusturur, sifreyi hash'ler ve token uretir
   async register(userData) {
     const mevcutKullanici = await this.repo.findByEmail(userData.email);
     if (mevcutKullanici) throw new Error("Bu e-posta adresi zaten kayıtlı.");
@@ -28,6 +29,7 @@ export class UserManager extends BaseManager {
     return { kullanici: toUserDTO(yeniKullanici), token };
   }
 
+  // Giris: kullanici dogrular ve token dondurur
   async login(email, sifre) {
     const kullanici = await this.repo.findByEmail(email);
     if (!kullanici) throw new Error("E-posta veya şifre hatalı.");
@@ -39,6 +41,7 @@ export class UserManager extends BaseManager {
     return { kullanici: toUserDTO(kullanici), token };
   }
 
+  // Token uretimi: JWT ile 7 gunluk oturum
   _tokenUret(kullaniciId) {
     return jwt.sign({ id: kullaniciId }, config.jwtSecret, { expiresIn: "7d" });
   }
