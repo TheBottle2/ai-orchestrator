@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "../../../../../core/db.js";
 import { ChatManager } from "../../../../../features/chat/chat.manager.js";
 import { MessageSendSchema } from "../../../../../features/chat/dto/chat.dto.js";
+import { getAuthUserId } from "../../../../../lib/auth.js";
 
 const m = new ChatManager();
 
@@ -18,10 +19,16 @@ export async function POST(req, { params }) {
     }
     
     await connectDB();
+    const kullanici_id = getAuthUserId(req);
     const body = await req.json();
-    const { mesaj } = MessageSendSchema.parse(body);
+    const { mesaj, baslik } = MessageSendSchema.parse(body);
+
+    const chat = await m.getSession(id);
+    if (!chat || String(chat.kullanici_id) !== String(kullanici_id)) {
+      return NextResponse.json({ mesaj: "Yetkisiz" }, { status: 403 });
+    }
     
-    const result = await m.sendMessage(id, mesaj);
+    const result = await m.sendMessage(id, mesaj, baslik);
     return NextResponse.json(result);
     
   } catch (e) {
@@ -30,6 +37,9 @@ export async function POST(req, { params }) {
         { hatalar: e.errors },
         { status: 400 }
       );
+    }
+    if (e.status === 401) {
+      return NextResponse.json({ mesaj: "Yetkisiz" }, { status: 401 });
     }
     return NextResponse.json(
       { mesaj: e.message },

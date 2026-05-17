@@ -13,10 +13,11 @@ export class ChatManager extends BaseManager {
   }
 
   // Yeni sohbet oturumu olusturur (veri MongoDB'ye yazilir)
-  async createSession(kullanici_id, baslik) {
+  async createSession(kullanici_id, baslik, models) {
     return await this.repo.create({
       ad: baslik || "Yeni Sohbet",
       kullanici_id,
+      models,
       turlar: [],
     });
   }
@@ -44,21 +45,34 @@ export class ChatManager extends BaseManager {
   }
 
   // Mesaji 3 adimli pipeline'a gonderir ve sonucu kaydeder
-  async sendMessage(chatId, kullaniciSorusu) {
+  async sendMessage(chatId, kullaniciSorusu, baslik) {
     const baslangic = Date.now();
 
-    const adim1 = await this._modelCagir(config.models.model1, [
-      { role: "system", content: config.models.model1.sistem },
+    const chat = await this.repo.getById(chatId);
+    if (!chat) throw new Error("Sohbet bulunamadı.");
+
+    if (baslik && chat.ad === "Yeni Sohbet") {
+      await this.repo.updateChat(chatId, { ad: baslik });
+      chat.ad = baslik;
+    }
+
+    const models = chat.models || {};
+    const model1 = { ...config.models.model1, id: models.model1 || config.models.model1.id };
+    const model2 = { ...config.models.model2, id: models.model2 || config.models.model2.id };
+    const model3 = { ...config.models.model3, id: models.model3 || config.models.model3.id };
+
+    const adim1 = await this._modelCagir(model1, [
+      { role: "system", content: model1.sistem },
       { role: "user",   content: kullaniciSorusu },
     ]);
 
-    const adim2 = await this._modelCagir(config.models.model2, [
-      { role: "system", content: config.models.model2.sistem },
+    const adim2 = await this._modelCagir(model2, [
+      { role: "system", content: model2.sistem },
       { role: "user",   content: `Soru: ${kullaniciSorusu}\n\nYanıt:\n${adim1.icerik}` },
     ]);
 
-    const adim3 = await this._modelCagir(config.models.model3, [
-      { role: "system", content: config.models.model3.sistem },
+    const adim3 = await this._modelCagir(model3, [
+      { role: "system", content: model3.sistem },
       { role: "user",   content: `Soru: ${kullaniciSorusu}\n\nYanıt:\n${adim1.icerik}\n\nEleştiri:\n${adim2.icerik}` },
     ]);
 
@@ -76,6 +90,7 @@ export class ChatManager extends BaseManager {
       final_yanit:    adim3.icerik,
       pipeline:       { model1: adim1, model2: adim2, model3: adim3 },
       toplam_sure_ms: toplamSure,
+      baslik:         chat.ad,
     };
   }
 

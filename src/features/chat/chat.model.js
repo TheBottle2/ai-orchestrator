@@ -29,6 +29,11 @@ const chatSchema = new mongoose.Schema(
       required: true,
       index:    true,
     },
+    models: {
+      model1: { type: String },
+      model2: { type: String },
+      model3: { type: String },
+    },
     turlar: { type: [turSchema], default: [] },
   },
   baseSchemaOptions
