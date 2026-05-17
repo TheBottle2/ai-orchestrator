@@ -1,4 +1,5 @@
 "use client";
+// Sohbet UI: oturum listesi, mesajlasma, model secimi ve pipeline detaylari
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -18,10 +19,10 @@ const toChatMessages = (turlar = []) => {
   const out = [];
   for (const tur of turlar) {
     if (tur?.kullanici_mesaji) {
-      out.push({ rol: "user", icerik: tur.kullanici_mesaji });
+      out.push({ id: makeMessageId(), rol: "user", icerik: tur.kullanici_mesaji });
     }
     if (tur?.final_cevap) {
-      out.push({ rol: "assistant", icerik: tur.final_cevap, pipeline: tur.pipeline });
+      out.push({ id: makeMessageId(), rol: "assistant", icerik: tur.final_cevap, pipeline: tur.pipeline });
     }
   }
   return out;
@@ -39,6 +40,13 @@ const normalizePipeline = (pipeline) => {
   return pipeline;
 };
 
+const makeMessageId = () => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+};
+
 export default function Chat() {
   const router = useRouter();
   const [kullanici, setKullanici] = useState(null);
@@ -49,7 +57,7 @@ export default function Chat() {
   const [yukleniyor, setYukleniyor] = useState(false);
   const [sendingSessionId, setSendingSessionId] = useState(null);
   const [sessionHata, setSessionHata] = useState("");
-  const [activeDetailIndex, setActiveDetailIndex] = useState(null);
+  const [activeDetailId, setActiveDetailId] = useState(null);
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [showModelPanel, setShowModelPanel] = useState(false);
@@ -109,6 +117,7 @@ export default function Chat() {
       inFlightControllerRef.current.abort();
       inFlightControllerRef.current = null;
     }
+    requestIdRef.current += 1;
     setYukleniyor(false);
     setSendingSessionId(null);
   }
@@ -116,6 +125,11 @@ export default function Chat() {
   function handleAuthFailure(res) {
     if (res.status !== 401) return false;
     localStorage.clear();
+    setSessions([]);
+    setMesajlar([]);
+    setActiveSessionId(null);
+    setActiveDetailId(null);
+    setSessionHata("");
     router.push("/login");
     return true;
   }
@@ -151,7 +165,7 @@ export default function Chat() {
       if (handleAuthFailure(res)) return;
       if (!res.ok) throw new Error(data.mesaj || "Sohbet detayı alınamadı.");
       setMesajlar(toChatMessages(data.turlar));
-      setActiveDetailIndex(null);
+      setActiveDetailId(null);
     } catch (err) {
       setSessionHata(err.message);
     }
@@ -166,6 +180,10 @@ export default function Chat() {
       const data = await res.json();
       const list = Array.isArray(data?.models) ? data.models : [];
       setAvailableModels(list);
+
+      if (list.length === 0) {
+        setModelError("Model listesi boş. Lütfen Ollama modellerini kontrol edin.");
+      }
 
       const pick = (value, fallback) => (list.includes(value) ? value : fallback);
       const stored = localStorage.getItem("modelSelection");
@@ -195,33 +213,54 @@ export default function Chat() {
   const presets = useMemo(() => {
     if (!availableModels.length) return [];
 
-    const pick = (name) => (availableModels.includes(name) ? name : availableModels[0]);
+    const filtered = availableModels.filter((name) => !name.includes(":cloud"));
+    const candidates = filtered.length ? filtered : availableModels;
+
+    const withSize = candidates.map((name, index) => {
+      const match = name.match(/:(\d+(?:\.\d+)?)b/i);
+      return {
+        name,
+        index,
+        size: match ? Number(match[1]) : Number.POSITIVE_INFINITY,
+      };
+    });
+
+    const sorted = [...withSize].sort((a, b) => {
+      if (a.size === b.size) return a.index - b.index;
+      return a.size - b.size;
+    });
+
+    const pickAt = (idx) => sorted[Math.min(idx, sorted.length - 1)]?.name || candidates[0];
+    const small = pickAt(0);
+    const mid = pickAt(Math.floor((sorted.length - 1) / 2));
+    const large = pickAt(sorted.length - 1);
+
     return [
       {
         key: "hizli",
         label: "Hızlı",
         values: {
-          model1: pick("qwen2.5:1.5b"),
-          model2: pick("qwen2.5:1.5b"),
-          model3: pick("qwen2.5:1.5b"),
+          model1: small,
+          model2: small,
+          model3: small,
         },
       },
       {
         key: "dengeli",
         label: "Dengeli",
         values: {
-          model1: pick("qwen2.5:1.5b"),
-          model2: pick("qwen2.5:3b"),
-          model3: pick("llama3.2:3b"),
+          model1: small,
+          model2: mid,
+          model3: mid,
         },
       },
       {
         key: "kaliteli",
         label: "Kaliteli",
         values: {
-          model1: pick("qwen2.5:3b"),
-          model2: pick("qwen2.5:3b"),
-          model3: pick("llama3.2:3b"),
+          model1: mid,
+          model2: large,
+          model3: large,
         },
       },
     ];
@@ -230,6 +269,9 @@ export default function Chat() {
   async function createSession() {
     if (!modelSelection.model1 || !modelSelection.model2 || !modelSelection.model3) return;
     try {
+      if (sendingSessionId) {
+        abortInFlight();
+      }
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
@@ -255,12 +297,13 @@ export default function Chat() {
     if (!input.trim() || yukleniyor || !activeSessionId) return;
     const soru = input.trim();
     const sessionId = activeSessionId;
+    const messageBaseId = makeMessageId();
     const requestId = ++requestIdRef.current;
     const controller = new AbortController();
     inFlightControllerRef.current = controller;
     setInput("");
-    setActiveDetailIndex(null);
-    setMesajlar((prev) => [...prev, { rol: "user", icerik: soru }]);
+    setActiveDetailId(null);
+    setMesajlar((prev) => [...prev, { id: `${messageBaseId}-user`, rol: "user", icerik: soru }]);
     setYukleniyor(true);
     setSendingSessionId(sessionId);
 
@@ -280,7 +323,12 @@ export default function Chat() {
       if (activeSessionRef.current !== sessionId) return;
       setMesajlar((prev) => [
         ...prev,
-        { rol: "assistant", icerik: data.final_yanit, pipeline: data.pipeline },
+        {
+          id: `${messageBaseId}-assistant`,
+          rol: "assistant",
+          icerik: data.final_yanit,
+          pipeline: data.pipeline,
+        },
       ]);
       if (data.baslik) {
         await loadSessions(sessionId);
@@ -350,6 +398,9 @@ export default function Chat() {
 
   async function deleteSession(sessionId) {
     try {
+      if (sendingSessionId) {
+        abortInFlight();
+      }
       const res = await fetch(`/api/chat/${sessionId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json", ...authHeaders },
@@ -477,26 +528,26 @@ export default function Chat() {
               </div>
             )}
 
-            {mesajlar.map((m, i) => {
+            {mesajlar.map((m) => {
               const pipeline = normalizePipeline(m.pipeline);
-              const showDetail = pipeline && activeDetailIndex === i;
+              const showDetail = pipeline && activeDetailId === m.id;
               return (
-                <div key={`${i}-${m.rol}`} className="space-y-2">
-                <div className={`flex ${m.rol === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-2xl rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                    m.rol === "user"
-                      ? "bg-blue-600 text-white"
-                      : m.rol === "hata"
-                      ? "bg-red-950 border border-red-800 text-red-300"
-                      : "bg-gray-800 text-gray-100"
-                  }`}>
-                    {m.icerik}
+                <div key={m.id || makeMessageId()} className="space-y-2">
+                  <div className={`flex ${m.rol === "user" ? "justify-end" : "justify-start"}`}>
+                    <div className={`max-w-2xl rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                      m.rol === "user"
+                        ? "bg-blue-600 text-white"
+                        : m.rol === "hata"
+                        ? "bg-red-950 border border-red-800 text-red-300"
+                        : "bg-gray-800 text-gray-100"
+                    }`}>
+                      {m.icerik}
+                    </div>
                   </div>
-                </div>
                   {pipeline && (
                     <div className={`flex ${m.rol === "user" ? "justify-end" : "justify-start"}`}>
                       <button
-                        onClick={() => setActiveDetailIndex(showDetail ? null : i)}
+                        onClick={() => setActiveDetailId(showDetail ? null : m.id)}
                         className="text-xs text-gray-400 hover:text-gray-200"
                       >
                         {showDetail ? "Detayı Kapat" : "Detay"}
@@ -509,7 +560,7 @@ export default function Chat() {
                         <p className="text-gray-500 text-xs font-medium uppercase tracking-wider">Pipeline Detayı</p>
                         <button
                           className="text-xs text-gray-500 hover:text-gray-300"
-                          onClick={() => setActiveDetailIndex(null)}
+                          onClick={() => setActiveDetailId(null)}
                         >
                           Kapat
                         </button>

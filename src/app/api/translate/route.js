@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+// Ceviri endpointi: metni model ile hedef dile cevirir
 import { config } from "../../../core/config.js";
 import { getAuthUserId } from "../../../lib/auth.js";
 

@@ -34,7 +34,7 @@ export class ChatRepo extends BaseRepo {
   async addMessage(chatId, tur) {
     return await this.model.findByIdAndUpdate(
       chatId,
-      { $push: { turlar: tur } },
+      { $push: { turlar: tur }, $set: { degistirilme_tarihi: new Date() } },
       { new: true }
     );
   }

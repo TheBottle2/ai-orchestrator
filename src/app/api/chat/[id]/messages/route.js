@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+// Mesaj gonderme endpointi: pipeline calisir ve sohbet guncellenir
 import { connectDB } from "../../../../../core/db.js";
 import { ChatManager } from "../../../../../features/chat/chat.manager.js";
 import { MessageSendSchema } from "../../../../../features/chat/dto/chat.dto.js";

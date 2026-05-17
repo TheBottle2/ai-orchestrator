@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+// Sohbet listeleme ve yeni sohbet olusturma endpointleri
 import { connectDB } from "../../../core/db.js";
 import { ChatManager } from "../../../features/chat/chat.manager.js";
 import { ChatCreateSchema } from "../../../features/chat/dto/chat.dto.js";

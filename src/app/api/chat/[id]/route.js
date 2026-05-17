@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+// Sohbet detayi, baslik guncelleme ve silme endpointleri
 import { connectDB } from "../../../../core/db.js";
 import { ChatManager } from "../../../../features/chat/chat.manager.js";
 import { getAuthUserId } from "../../../../lib/auth.js";

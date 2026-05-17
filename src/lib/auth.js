@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+// Token dogrulama yardimcisi
 import { config } from "../core/config.js";
 
 export function getAuthUserId(req) {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+// Ollama canli model listesi endpointi
 import { config } from "../../../core/config.js";
 
 function fallbackModels() {

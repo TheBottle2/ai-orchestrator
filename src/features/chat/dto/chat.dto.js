@@ -1,4 +1,5 @@
 import { z } from "zod";
+// Sohbet icin API dogrulama semalari
 
 export const ChatCreateSchema = z.object({
   baslik:       z.string().optional(),

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+// Sohbet veri modeli: turlar, pipeline ve model secimleri
 import { baseSchemaFields, baseSchemaOptions } from "../../base/BaseModel.js";
 
 const adimSchema = new mongoose.Schema(

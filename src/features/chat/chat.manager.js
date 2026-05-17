@@ -1,4 +1,5 @@
 import { BaseManager } from "../../base/BaseManager.js";
+// Sohbet is mantigi: pipeline, model secimi ve kayit akisi
 import { ChatRepo } from "./chat.repo.js";
 import { config } from "../../core/config.js";
 

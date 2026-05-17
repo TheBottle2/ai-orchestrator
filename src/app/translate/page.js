@@ -1,4 +1,5 @@
 "use client";
+// Ceviri UI: kaynak/hedef dil secimi ve sonuc goruntuleme
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -23,7 +24,9 @@ export default function Translate() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [model, setModel] = useState("translategemma:4b");
+  const [model, setModel] = useState("");
+  const [availableModels, setAvailableModels] = useState([]);
+  const [modelLoading, setModelLoading] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -35,6 +38,26 @@ export default function Translate() {
     }
     setToken(stored);
   }, [router]);
+
+  useEffect(() => {
+    async function loadModels() {
+      setModelLoading(true);
+      try {
+        const res = await fetch("/api/models");
+        const data = await res.json();
+        const list = Array.isArray(data?.models) ? data.models : [];
+        setAvailableModels(list);
+        setModel(list[0] || "translategemma:4b");
+      } catch {
+        setAvailableModels([]);
+        setModel("translategemma:4b");
+      } finally {
+        setModelLoading(false);
+      }
+    }
+
+    loadModels();
+  }, []);
 
   const authHeaders = useMemo(() => {
     if (!token) return {};
@@ -143,12 +166,19 @@ export default function Translate() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <label className="text-gray-400 text-xs">Model</label>
-              <input
+              <select
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
                 className="bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-1 text-xs"
-                placeholder="translategemma:4b"
-              />
+                disabled={modelLoading}
+              >
+                {availableModels.length === 0 && (
+                  <option value="">Model bulunamadı</option>
+                )}
+                {availableModels.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
             </div>
             <button
               onClick={translate}
