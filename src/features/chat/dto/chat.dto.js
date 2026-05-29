@@ -11,6 +11,6 @@ export const ChatCreateSchema = z.object({
 });
 
 export const MessageSendSchema = z.object({
-  mesaj: z.string().min(1, "Mesaj boş olamaz"),
-  baslik: z.string().min(1).optional(),
+mesaj: z.string().min(1, "Mesaj boş olamaz").max(5000, "Mesaj en fazla 5000 karakter olabilir"),
+baslik: z.string().min(1).max(100).optional(),
 });

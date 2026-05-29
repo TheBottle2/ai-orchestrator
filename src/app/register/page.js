@@ -25,10 +25,15 @@ export default function Register() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.mesaj || "Kayıt başarısız.");
+      const kullanici = data?.kullanici && typeof data.kullanici === "object" ? data.kullanici : null;
       // Token ve kullanici bilgisi dinamik olarak gelir ve localStorage'a yazilir
       localStorage.setItem("token", data.token);
-      localStorage.setItem("kullanici", JSON.stringify(data.kullanici));
-      router.push("/chat");
+      if (kullanici) {
+        localStorage.setItem("kullanici", JSON.stringify(kullanici));
+      } else {
+        localStorage.removeItem("kullanici");
+      }
+      await router.replace("/chat");
     } catch (err) {
       setHata(err.message);
     } finally {

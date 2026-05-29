@@ -3,8 +3,6 @@ import { BaseManager } from "../../base/BaseManager.js";
 import { ChatRepo } from "./chat.repo.js";
 import { config } from "../../core/config.js";
 
-// Cache mekanizması için global değişken
-const modelCache = new Map();
 const repo = new ChatRepo();
 const LM_URL = `${config.ollamaBaseUrl}/v1/chat/completions`;
 
@@ -96,24 +94,25 @@ export class ChatManager extends BaseManager {
   }
 
   // Ollama'ya istek atar ve yaniti duzenler
-  async _modelCagir(modelConfig, messages) {
-    const cacheKey = modelConfig.id;
-    const baslangic = Date.now();
+async _modelCagir(modelConfig, messages) {
+const baslangic = Date.now();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 180000); // 3 dakika
 
-    try {
-      const response = await fetch(LM_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: modelConfig.id,
-          messages,
-          temperature: config.temperature,
-          max_tokens: config.maxTokens,
-        }),
-      });
+try {
+const response = await fetch(LM_URL, {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+signal: controller.signal,
+body: JSON.stringify({
+model: modelConfig.id,
+messages,
+temperature: config.temperature,
+max_tokens: config.maxTokens,
+}),
+}).catch(() => {
+throw new Error("AI sunucusuna ulaşılamıyor. Ollama'nın çalıştığından emin olun.");
+});
 
       if (!response.ok) {
         throw new Error(`Model hatası: ${modelConfig.id} — HTTP ${response.status}`);
@@ -121,12 +120,9 @@ export class ChatManager extends BaseManager {
 
       const data = await response.json();
       const ham = data.choices?.[0]?.message?.content || "";
-      const icerik = this._temizle(ham);
+const icerik = this._temizle(ham);
 
-      // Cache'i guncelle (model son kullanimi)
-      modelCache.set(cacheKey, { lastUsed: Date.now() });
-
-      return {
+return {
         model_id: modelConfig.id,
         rol: modelConfig.rol,
         icerik,

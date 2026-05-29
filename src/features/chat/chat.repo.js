@@ -31,13 +31,13 @@ export class ChatRepo extends BaseRepo {
   }
 
   // Sohbete yeni mesaj turu ekler
-  async addMessage(chatId, tur) {
-    return await this.model.findByIdAndUpdate(
-      chatId,
-      { $push: { turlar: tur }, $set: { degistirilme_tarihi: new Date() } },
-      { new: true }
-    );
-  }
+async addMessage(chatId, tur) {
+return await this.model.findByIdAndUpdate(
+chatId,
+{ $push: { turlar: tur }, $set: { degistirilme_tarihi: new Date() } },
+{ returnDocument: "after" }
+);
+}
 
   async updateChat(chatId, data) {
     return await this.patch(chatId, data);
