@@ -1,6 +1,6 @@
 "use client";
 // Ceviri UI: kaynak/hedef dil secimi ve sonuc goruntuleme
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const LANGUAGES = [
@@ -17,7 +17,11 @@ const LANGUAGES = [
 
 export default function Translate() {
   const router = useRouter();
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const t = localStorage.getItem("token");
+    return (t === "null" || t === "undefined") ? null : t;
+  });
   const [sourceLang, setSourceLang] = useState("tr");
   const [targetLang, setTargetLang] = useState("en");
   const [text, setText] = useState("");
@@ -29,47 +33,45 @@ export default function Translate() {
   const [modelLoading, setModelLoading] = useState(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = localStorage.getItem("token");
-    if (!stored) {
-      localStorage.clear();
+    if (!token) {
       router.push("/login");
-      return;
     }
-    setToken(stored);
-  }, [router]);
+  }, [router, token]);
 
-  useEffect(() => {
-    async function loadModels() {
-      setModelLoading(true);
-      try {
-        const res = await fetch("/api/models");
-        const data = await res.json();
-        const list = Array.isArray(data?.models) ? data.models : [];
-        setAvailableModels(list);
-        setModel(list[0] || "translategemma:4b");
-      } catch {
-        setAvailableModels([]);
-        setModel("translategemma:4b");
-      } finally {
-        setModelLoading(false);
-      }
-    }
+const authHeaders = useMemo(() => {
+if (!token) return {};
+return { Authorization: `Bearer ${token}` };
+}, [token]);
 
-    loadModels();
-  }, []);
-
-  const authHeaders = useMemo(() => {
-    if (!token) return {};
-    return { Authorization: `Bearer ${token}` };
-  }, [token]);
-
-  function handleAuthFailure(res) {
+  const handleAuthFailure = useCallback((res) => {
     if (res.status !== 401) return false;
-    localStorage.clear();
+    localStorage.removeItem("token");
+    localStorage.removeItem("kullanici");
     router.push("/login");
     return true;
-  }
+  }, [router]);
+
+useEffect(() => {
+if (!token) return;
+async function loadModels() {
+setModelLoading(true);
+try {
+const res = await fetch("/api/models", { headers: { ...authHeaders } });
+const data = await res.json();
+if (handleAuthFailure(res)) return;
+const list = Array.isArray(data?.models) ? data.models : [];
+setAvailableModels(list);
+setModel(list[0] || "translategemma:4b");
+} catch {
+setAvailableModels([]);
+setModel("translategemma:4b");
+} finally {
+setModelLoading(false);
+}
+}
+
+loadModels();
+}, [token, authHeaders, handleAuthFailure]);
 
   async function translate() {
     if (!text.trim() || loading) return;

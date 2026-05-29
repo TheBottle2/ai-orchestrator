@@ -1,6 +1,6 @@
 "use client";
 // Sohbet UI: oturum listesi, mesajlasma, model secimi ve pipeline detaylari
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -40,6 +40,67 @@ const normalizePipeline = (pipeline) => {
   return pipeline;
 };
 
+const splitTokens = (tokens, regex, type) => {
+  const out = [];
+  for (const token of tokens) {
+    if (token.type !== "text") {
+      out.push(token);
+      continue;
+    }
+    const text = token.content;
+    let lastIndex = 0;
+    let match;
+    regex.lastIndex = 0;
+    while ((match = regex.exec(text))) {
+      if (match.index > lastIndex) {
+        out.push({ type: "text", content: text.slice(lastIndex, match.index) });
+      }
+      out.push({ type, content: match[1] });
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) {
+      out.push({ type: "text", content: text.slice(lastIndex) });
+    }
+  }
+  return out;
+};
+
+const renderRichText = (text) => {
+  if (!text) return text;
+  let tokens = [{ type: "text", content: String(text) }];
+
+  tokens = splitTokens(tokens, /`([^`]+)`/g, "code");
+  tokens = splitTokens(tokens, /\*\*(.+?)\*\*/g, "bold");
+  tokens = splitTokens(tokens, /__(.+?)__/g, "underline");
+  tokens = splitTokens(tokens, /~~(.+?)~~/g, "strike");
+  tokens = splitTokens(tokens, /\*(.+?)\*/g, "italic");
+  tokens = splitTokens(tokens, /_(.+?)_/g, "italic");
+
+  return tokens.map((token, idx) => {
+    switch (token.type) {
+      case "bold":
+        return <strong key={`b-${idx}`}>{token.content}</strong>;
+      case "italic":
+        return <em key={`i-${idx}`}>{token.content}</em>;
+      case "underline":
+        return <span key={`u-${idx}`} className="underline">{token.content}</span>;
+      case "strike":
+        return <del key={`s-${idx}`}>{token.content}</del>;
+      case "code":
+        return (
+          <code
+            key={`c-${idx}`}
+            className="rounded bg-gray-900/70 px-1.5 py-0.5 font-mono text-[0.75rem] text-gray-200"
+          >
+            {token.content}
+          </code>
+        );
+      default:
+        return <span key={`t-${idx}`}>{token.content}</span>;
+    }
+  });
+};
+
 const makeMessageId = () => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -70,25 +131,115 @@ export default function Chat() {
   const inFlightControllerRef = useRef(null);
   const activeSessionRef = useRef(null);
 
-  const [token, setToken] = useState(null);
+  const [systemStatus, setSystemStatus] = useState("checking");
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    setToken(localStorage.getItem("token"));
+    async function checkHealth() {
+      try {
+        const res = await fetch("/api/health");
+        const data = await res.json();
+        setSystemStatus(data.status);
+      } catch {
+        setSystemStatus("error");
+      }
+    }
+    checkHealth();
   }, []);
 
+  const [token, setToken] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const t = localStorage.getItem("token");
+    return (t === "null" || t === "undefined") ? null : t;
+  });
 
-  const authHeaders = useMemo(() => {
-    if (!token) return {};
-    return { Authorization: `Bearer ${token}` };
-  }, [token]);
+
+const authHeaders = useMemo(() => {
+if (!token) return {};
+return { Authorization: `Bearer ${token}` };
+}, [token]);
+
+const isActiveLoading = yukleniyor && sendingSessionId === activeSessionId;
+
+useEffect(() => {
+activeSessionRef.current = activeSessionId;
+}, [activeSessionId]);
+
+useEffect(() => {
+altRef.current?.scrollIntoView({ behavior: "smooth" });
+}, [mesajlar, isActiveLoading]);
+
+function abortInFlight() {
+if (inFlightControllerRef.current) {
+inFlightControllerRef.current.abort();
+inFlightControllerRef.current = null;
+}
+requestIdRef.current += 1;
+setYukleniyor(false);
+setSendingSessionId(null);
+}
+
+const handleAuthFailure = useCallback((res) => {
+if (res.status !== 401) return false;
+localStorage.removeItem("token");
+localStorage.removeItem("kullanici");
+setSessions([]);
+setMesajlar([]);
+setActiveSessionId(null);
+setActiveDetailId(null);
+setSessionHata("");
+router.push("/login");
+return true;
+}, [router]);
+
+const loadSessionDetail = useCallback(async (sessionId) => {
+try {
+setSessionHata("");
+const bearer = typeof window !== "undefined" ? localStorage.getItem("token") : token;
+const res = await fetch(`/api/chat/${sessionId}`, { headers: { "Content-Type": "application/json", ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) } });
+const data = await res.json();
+if (handleAuthFailure(res)) return;
+if (!res.ok) throw new Error(data.mesaj || "Sohbet detayı alınamadı.");
+setMesajlar(toChatMessages(data.turlar));
+setActiveDetailId(null);
+} catch (err) {
+setSessionHata(err.message);
+}
+}, [handleAuthFailure, token]);
+
+const loadSessions = useCallback(async (selectedId) => {
+try {
+setSessionHata("");
+const bearer = typeof window !== "undefined" ? localStorage.getItem("token") : token;
+const res = await fetch("/api/chat", { headers: { "Content-Type": "application/json", ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) } });
+const data = await res.json();
+if (handleAuthFailure(res)) return;
+if (!res.ok) throw new Error(data.mesaj || "Sohbetler alınamadı.");
+
+const list = Array.isArray(data) ? data : [];
+setSessions(list);
+
+const nextId = selectedId || list[0]?._id || null;
+setActiveSessionId(nextId);
+if (nextId) {
+await loadSessionDetail(nextId);
+} else {
+setMesajlar([]);
+}
+} catch (err) {
+setSessionHata(err.message);
+}
+}, [handleAuthFailure, loadSessionDetail, token]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      router.push("/login");
+      return;
+    }
     const k = localStorage.getItem("kullanici");
     if (!k || k === "undefined" || k === "null") {
-      localStorage.clear();
-      router.push("/login");
+      localStorage.removeItem("kullanici");
+      setKullanici(null);
+      loadSessions();
       return;
     }
 
@@ -97,86 +248,20 @@ export default function Chat() {
       setKullanici(parsed);
       loadSessions();
     } catch {
-      localStorage.clear();
-      router.push("/login");
+      localStorage.removeItem("kullanici");
+      setKullanici(null);
+      loadSessions();
     }
-  }, [router, token]);
+  }, [router, token, loadSessions]);
 
-  const isActiveLoading = yukleniyor && sendingSessionId === activeSessionId;
-
-  useEffect(() => {
-    activeSessionRef.current = activeSessionId;
-  }, [activeSessionId]);
-
-  useEffect(() => {
-    altRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [mesajlar, isActiveLoading]);
-
-  function abortInFlight() {
-    if (inFlightControllerRef.current) {
-      inFlightControllerRef.current.abort();
-      inFlightControllerRef.current = null;
-    }
-    requestIdRef.current += 1;
-    setYukleniyor(false);
-    setSendingSessionId(null);
-  }
-
-  function handleAuthFailure(res) {
-    if (res.status !== 401) return false;
-    localStorage.clear();
-    setSessions([]);
-    setMesajlar([]);
-    setActiveSessionId(null);
-    setActiveDetailId(null);
-    setSessionHata("");
-    router.push("/login");
-    return true;
-  }
-
-  async function loadSessions(selectedId) {
-    try {
-      setSessionHata("");
-      const res = await fetch("/api/chat", { headers: { "Content-Type": "application/json", ...authHeaders } });
-      const data = await res.json();
-      if (handleAuthFailure(res)) return;
-      if (!res.ok) throw new Error(data.mesaj || "Sohbetler alınamadı.");
-
-      const list = Array.isArray(data) ? data : [];
-      setSessions(list);
-
-      const nextId = selectedId || list[0]?._id || null;
-      setActiveSessionId(nextId);
-      if (nextId) {
-        await loadSessionDetail(nextId);
-      } else {
-        setMesajlar([]);
-      }
-    } catch (err) {
-      setSessionHata(err.message);
-    }
-  }
-
-  async function loadSessionDetail(sessionId) {
-    try {
-      setSessionHata("");
-      const res = await fetch(`/api/chat/${sessionId}`, { headers: { "Content-Type": "application/json", ...authHeaders } });
-      const data = await res.json();
-      if (handleAuthFailure(res)) return;
-      if (!res.ok) throw new Error(data.mesaj || "Sohbet detayı alınamadı.");
-      setMesajlar(toChatMessages(data.turlar));
-      setActiveDetailId(null);
-    } catch (err) {
-      setSessionHata(err.message);
-    }
-  }
 
   async function openModelPanel() {
     setShowModelPanel(true);
     setModelLoading(true);
     setModelError("");
     try {
-      const res = await fetch("/api/models");
+      const bearer = typeof window !== "undefined" ? localStorage.getItem("token") : token;
+      const res = await fetch("/api/models", { headers: { ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) } });
       const data = await res.json();
       const list = Array.isArray(data?.models) ? data.models : [];
       setAvailableModels(list);
@@ -432,7 +517,8 @@ export default function Chat() {
   }
 
   function cikisYap() {
-    localStorage.clear();
+    localStorage.removeItem("token");
+    localStorage.removeItem("kullanici");
     router.push("/login");
   }
 
@@ -440,7 +526,10 @@ export default function Chat() {
     <div className="min-h-screen bg-gray-950 flex flex-col">
       <div className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-white font-semibold">AI Orchestrator</h1>
+          <h1 className="text-white font-semibold flex items-center gap-2">
+            AI Orchestrator
+            <div className={`w-1.5 h-1.5 rounded-full ${systemStatus === "healthy" ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : systemStatus === "degraded" ? "bg-yellow-500" : "bg-red-500"}`} title={`Sistem: ${systemStatus}`} />
+          </h1>
           <p className="text-gray-500 text-xs">3 model pipeline · Yanıtlayıcı → Eleştirmen → Sentezci</p>
         </div>
         <div className="flex items-center gap-4">
@@ -534,14 +623,14 @@ export default function Chat() {
               return (
                 <div key={m.id || makeMessageId()} className="space-y-2">
                   <div className={`flex ${m.rol === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-2xl rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                    <div className={`max-w-2xl rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                       m.rol === "user"
                         ? "bg-blue-600 text-white"
                         : m.rol === "hata"
                         ? "bg-red-950 border border-red-800 text-red-300"
                         : "bg-gray-800 text-gray-100"
                     }`}>
-                      {m.icerik}
+                      {renderRichText(m.icerik)}
                     </div>
                   </div>
                   {pipeline && (
@@ -575,8 +664,8 @@ export default function Chat() {
                             }`}>{adim?.rol}</span>
                             <span className="text-gray-600 text-xs">{adim?.model_id} · {adim?.sure_ms}ms</span>
                           </div>
-                          <p className="text-gray-400 text-xs leading-relaxed pl-2 border-l border-gray-700">
-                            {adim?.icerik?.slice(0, 200)}{adim?.icerik?.length > 200 ? "..." : ""}
+                          <p className="text-gray-400 text-xs leading-relaxed pl-2 border-l border-gray-700 whitespace-pre-wrap">
+                            {renderRichText(adim?.icerik?.slice(0, 200))}{adim?.icerik?.length > 200 ? "..." : ""}
                           </p>
                         </div>
                       ))}
